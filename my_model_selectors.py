@@ -105,4 +105,27 @@ class SelectorCV(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection using CV
-        raise NotImplementedError
+
+        # Get series of sequences for this word
+        all_n_components = range(self.min_n_components, self.max_n_components+1)
+        split_method = KFold()
+        all_scores = []
+        for n_components in all_n_components:
+            try:
+                scores = []
+                if len(self.sequences) > 2:
+                    for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
+                        # Prepare training sequences
+                        self.X, self.lengths = combine_sequences(cv_train_idx, self.sequences)
+                        # Prepare testing sequences
+                        X_test, lengths_test = combine_sequences(cv_test_idx, self.sequences)
+                        model = self.base_model(n_components)
+                        scores.append(model.score(X_test, lengths_test))
+                    all_scores.append(np.mean(scores))
+                else:
+                    model = self.base_model(n_components)
+                    all_scores.append(model.score(self.X, self.lengths))
+            except ValueError:
+                # eliminate non-viable models from consideration
+                all_scores.append(float("-inf"))
+        return self.base_model(all_n_components[np.argmax(all_scores)])
