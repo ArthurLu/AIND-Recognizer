@@ -66,6 +66,19 @@ class SelectorBIC(ModelSelector):
 
     http://www2.imm.dtu.dk/courses/02433/doc/ch6_slides.pdf
     Bayesian information criteria: BIC = -2 * logL + p * logN
+
+    N: number of data points
+    p: number of parameters
+    Assume 
+        # of features = d
+        # of HMM states = n
+    Then
+    p = 
+        # of probabilities in transition matrix + 
+        # of Gaussian mean + 
+        # of Gaussian variance 
+      = 
+        n*(n-1) + 2*d*n
     """
 
     def select(self):
@@ -77,7 +90,19 @@ class SelectorBIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        all_n_components = range(self.min_n_components, self.max_n_components+1)
+        all_scores = []
+        N, d = self.X.shape
+        for n_components in all_n_components:
+            try:
+                model = self.base_model(n_components)
+                logL = model.score(self.X, self.lengths)
+                bic = -2 * logL + (n_components*(n_components-1) + 2*d*n_components) * np.log(N)
+                all_scores.append(bic)
+            except ValueError:
+                # eliminate non-viable models from consideration
+                all_scores.append(float("inf"))
+        return self.base_model(all_n_components[np.argmin(all_scores)])
 
 
 class SelectorDIC(ModelSelector):
@@ -106,7 +131,6 @@ class SelectorCV(ModelSelector):
 
         # TODO implement model selection using CV
 
-        # Get series of sequences for this word
         all_n_components = range(self.min_n_components, self.max_n_components+1)
         split_method = KFold()
         all_scores = []
