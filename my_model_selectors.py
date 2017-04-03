@@ -100,10 +100,12 @@ class SelectorBIC(ModelSelector):
                 bic = -2 * logL + (n_components*(n_components-1) + 2*d*n_components) * np.log(N)
                 all_scores.append(bic)
                 all_n_components.append(n_components)
-            except ValueError:
+            except:
                 # eliminate non-viable models from consideration
                 pass
-        return self.base_model(all_n_components[np.argmin(all_scores)])
+
+        best_num_components = all_n_components[np.argmin(all_scores)] if all_scores else self.n_constant
+        return self.base_model(best_num_components)
 
 
 class SelectorDIC(ModelSelector):
@@ -129,15 +131,23 @@ class SelectorDIC(ModelSelector):
                 sum_logL += logL
                 all_logLs.append(logL)
                 all_n_components.append(n_components)
-            except ValueError:
+            except:
                 # eliminate non-viable models from consideration
                 pass
+        
         M = len(all_n_components)-1 # It's actually M-1 value, not M
-        all_scores = [] # Store each DIC value
-        for logL in all_logLs:
-            dic = logL - (sum_logL-logL) / M
-            all_scores.append(dic)
-        return self.base_model(all_n_components[np.argmax(all_scores)])
+        if M > 1:
+            all_scores = [] # Store each DIC value
+            for logL in all_logLs:
+                dic = logL - (sum_logL-logL) / M
+                all_scores.append(dic)
+            best_num_components = all_n_components[np.argmax(all_scores)]
+        elif M == 1:
+            best_num_components = all_n_components[0]
+        else:
+            best_num_components = self.n_constant
+
+        return self.base_model(best_num_components)
 
 
 class SelectorCV(ModelSelector):
@@ -155,7 +165,7 @@ class SelectorCV(ModelSelector):
         all_scores = [] # Store each CV value
         for n_components in range(self.min_n_components, self.max_n_components+1):
             try:
-                if len(self.sequences) > 2:
+                if len(self.sequences) > 2: # Check if there are enough data to split
                     scores = []
                     for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
                         # Prepare training sequences
@@ -169,7 +179,9 @@ class SelectorCV(ModelSelector):
                     model = self.base_model(n_components)
                     all_scores.append(model.score(self.X, self.lengths))
                 all_n_components.append(n_components)
-            except ValueError:
+            except:
                 # eliminate non-viable models from consideration
                 pass
-        return self.base_model(all_n_components[np.argmax(all_scores)])
+
+        best_num_components = all_n_components[np.argmax(all_scores)] if all_scores else self.n_constant
+        return self.base_model(best_num_components)
