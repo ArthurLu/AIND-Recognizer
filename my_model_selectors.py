@@ -90,18 +90,19 @@ class SelectorBIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on BIC scores
-        all_n_components = range(self.min_n_components, self.max_n_components+1)
-        all_scores = []
+        all_n_components = []
+        all_scores = [] # Store each BIC value
         N, d = self.X.shape
-        for n_components in all_n_components:
+        for n_components in range(self.min_n_components, self.max_n_components+1):
             try:
                 model = self.base_model(n_components)
                 logL = model.score(self.X, self.lengths)
                 bic = -2 * logL + (n_components*(n_components-1) + 2*d*n_components) * np.log(N)
                 all_scores.append(bic)
+                all_n_components.append(n_components)
             except ValueError:
                 # eliminate non-viable models from consideration
-                all_scores.append(float("inf"))
+                pass
         return self.base_model(all_n_components[np.argmin(all_scores)])
 
 
@@ -118,7 +119,25 @@ class SelectorDIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        all_n_components = []
+        all_logLs = [] 
+        sum_logL = 0
+        for n_components in range(self.min_n_components, self.max_n_components+1):
+            try:
+                model = self.base_model(n_components)
+                logL = model.score(self.X, self.lengths)
+                sum_logL += logL
+                all_logLs.append(logL)
+                all_n_components.append(n_components)
+            except ValueError:
+                # eliminate non-viable models from consideration
+                pass
+        M = len(all_n_components)-1 # It's actually M-1 value, not M
+        all_scores = [] # Store each DIC value
+        for logL in all_logLs:
+            dic = logL - (sum_logL-logL) / M
+            all_scores.append(dic)
+        return self.base_model(all_n_components[np.argmax(all_scores)])
 
 
 class SelectorCV(ModelSelector):
@@ -131,13 +150,13 @@ class SelectorCV(ModelSelector):
 
         # TODO implement model selection using CV
 
-        all_n_components = range(self.min_n_components, self.max_n_components+1)
+        all_n_components = []
         split_method = KFold()
-        all_scores = []
-        for n_components in all_n_components:
+        all_scores = [] # Store each CV value
+        for n_components in range(self.min_n_components, self.max_n_components+1):
             try:
-                scores = []
                 if len(self.sequences) > 2:
+                    scores = []
                     for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
                         # Prepare training sequences
                         self.X, self.lengths = combine_sequences(cv_train_idx, self.sequences)
@@ -149,7 +168,8 @@ class SelectorCV(ModelSelector):
                 else:
                     model = self.base_model(n_components)
                     all_scores.append(model.score(self.X, self.lengths))
+                all_n_components.append(n_components)
             except ValueError:
                 # eliminate non-viable models from consideration
-                all_scores.append(float("-inf"))
+                pass
         return self.base_model(all_n_components[np.argmax(all_scores)])
