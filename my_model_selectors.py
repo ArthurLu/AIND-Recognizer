@@ -75,10 +75,11 @@ class SelectorBIC(ModelSelector):
     Then
     p = 
         # of probabilities in transition matrix + 
+        # of probabilities in initial distribution + 
         # of Gaussian mean + 
         # of Gaussian variance 
       = 
-        n*(n-1) + 2*d*n
+        n*(n-1) + (n-1) + 2*d*n
     """
 
     def select(self):
@@ -97,7 +98,7 @@ class SelectorBIC(ModelSelector):
             try:
                 model = self.base_model(n_components)
                 logL = model.score(self.X, self.lengths)
-                bic = -2 * logL + (n_components*(n_components-1) + 2*d*n_components) * np.log(N)
+                bic = -2 * logL + (n_components*(n_components-1) + (n_components-1) + 2*d*n_components) * np.log(N)
                 all_scores.append(bic)
                 all_n_components.append(n_components)
             except:
@@ -134,7 +135,7 @@ class SelectorDIC(ModelSelector):
             except:
                 # eliminate non-viable models from consideration
                 pass
-        
+
         M = len(all_n_components)-1 # It's actually M-1 value, not M
         if M > 1:
             all_scores = [] # Store each DIC value

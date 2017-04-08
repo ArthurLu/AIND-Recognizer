@@ -6,7 +6,7 @@ RAW_FEATURES = ['left-x', 'left-y', 'right-x', 'right-y']
 GROUND_FEATURES = ['grnd-rx', 'grnd-ry', 'grnd-lx', 'grnd-ly']
 
 
-def show_errors(guesses: list, test_set: SinglesData, verbose: bool=True):
+def show_errors(guesses: list, test_set: SinglesData, verbose: int=1):
     """ Print WER and sentence differences in tabular form
 
     :param guesses: list of test item answers, ordered
@@ -25,9 +25,11 @@ def show_errors(guesses: list, test_set: SinglesData, verbose: bool=True):
         if guesses[word_id] != test_set.wordlist[word_id]:
             S += 1
 
-    print("\n**** WER = {:.2f}%".format(float(S) / float(N) * 100))
-    print("Total correct: {} out of {}".format(N - S, N))
-    if verbose:
+    WER = float(S) / float(N) * 100
+    if verbose == 1:
+        print("\n**** WER = {:.2f}%".format(WER))
+        print("Total correct: {} out of {}".format(N - S, N))
+    if verbose > 1:
         print('Video  Recognized                                                    Correct')
         print('=====================================================================================================')
         for video_num in test_set.sentences_index:
@@ -37,8 +39,8 @@ def show_errors(guesses: list, test_set: SinglesData, verbose: bool=True):
                 if recognized_sentence[i] != correct_sentence[i]:
                     recognized_sentence[i] = '*' + recognized_sentence[i]
             print('{:5}: {:60}  {}'.format(video_num, ' '.join(recognized_sentence), ' '.join(correct_sentence)))
-
-
+    return WER
+        
 def getKey(item):
     return item[1]
 
