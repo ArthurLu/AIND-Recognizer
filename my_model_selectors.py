@@ -116,39 +116,67 @@ class SelectorDIC(ModelSelector):
     Document Analysis and Recognition, 2003. Proceedings. Seventh International Conference on. IEEE, 2003.
     http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.58.6208&rep=rep1&type=pdf
     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
+
+    DIC Equation:
+        DIC = log(P(X(i)) - 1/(M - 1) * sum(log(P(X(all but i))
+            (Equation (17) in Reference [0]. Assumes all data sets are same size)
+            = log likelihood of the data belonging to model
+              - avg of anti log likelihood of data X and model M
+            = log(P(original word)) - average(log(P(other words)))
+        
+            where anti log likelihood means likelihood of data X and model M belonging to competing categories
+            where log(P(X(i))) is the log-likelihood of the fitted model for the current word
+            (in terms of hmmlearn it is the model's score for the current word)
+            where where "L" is likelihood of data fitting the model ("fitted" model)
+            where X is input training data given in the form of a word dictionary
+            where X(i) is the current word being evaluated
+            where M is a specific model
+
+            Note:
+                - log likelihood of the data belonging to model
+                - anti_log_likelihood of data X vs model M
+    
+    Selection using DIC Model:
+        - Higher the DIC score the "better" the model.
+        - SelectorDIC accepts argument of ModelSelector instance of base class
+          with attributes such as: this_word, min_n_components, max_n_components,
+        - Loop from min_n_components to max_n_components
+        - Find the highest BIC score as the "better" model.
     '''
+
+    # Calculate anti log likelihoods.
+    def calc_log_likelihood_other_words(self, model, other_words):
+        return [model[1].score(word[0], word[1]) for word in other_words]
+
+    def calc_best_score_dic(self, score_dics):
+        # Max of list of lists comparing each item by value at index 0
+        return max(score_dics, key = lambda x: x[0])
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection based on DIC scores
-        all_n_components = []
-        all_logLs = [] 
-        sum_logL = 0
-        for n_components in range(self.min_n_components, self.max_n_components+1):
-            try:
-                model = self.base_model(n_components)
-                logL = model.score(self.X, self.lengths)
-                sum_logL += logL
-                all_logLs.append(logL)
-                all_n_components.append(n_components)
-            except:
-                # eliminate non-viable models from consideration
-                pass
+        other_words = []
+        models = []
+        score_dics = []
+        for word in self.words:
+            if word != self.this_word:
+                other_words.append(self.hwords[word])
+        try:
+            for num_states in range(self.min_n_components, self.max_n_components + 1):
+                hmm_model = self.base_model(num_states)
+                log_likelihood_original_word = hmm_model.score(self.X, self.lengths)
+                models.append((log_likelihood_original_word, hmm_model))
 
-        M = len(all_n_components)-1 # It's actually M-1 value, not M
-        if M > 1:
-            all_scores = [] # Store each DIC value
-            for logL in all_logLs:
-                dic = logL - (sum_logL-logL) / M
-                all_scores.append(dic)
-            best_num_components = all_n_components[np.argmax(all_scores)]
-        elif M == 1:
-            best_num_components = all_n_components[0]
-        else:
-            best_num_components = self.n_constant
-
-        return self.base_model(best_num_components)
+        # Note: Situation that may cause exception may be if have more parameters to fit
+        # than there are samples, so must catch exception when the model is invalid
+        except Exception as e:
+            # logging.exception('DIC Exception occurred: ', e)
+            pass
+        for index, model in enumerate(models):
+            log_likelihood_original_word, hmm_model = model
+            score_dic = log_likelihood_original_word - np.mean(self.calc_log_likelihood_other_words(model, other_words))
+            score_dics.append(tuple([score_dic, model[1]]))
+        return self.calc_best_score_dic(score_dics)[1] if score_dics else None
 
 
 class SelectorCV(ModelSelector):
